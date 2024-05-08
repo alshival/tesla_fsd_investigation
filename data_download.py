@@ -110,7 +110,8 @@ else:
 
 all_models = []
 if len(makes_for_year) > 0:
-    makes_for_year = makes_for_year.sample(500)
+    sample_size = min(500,len(makes_for_year))
+    makes_for_year = makes_for_year.sample(sample_size)
     for _,row in makes_for_year.iterrows():
         print(f"Downloading {row['make']} {row['modelYear']} models")
         # Download models
@@ -185,11 +186,12 @@ join (select distinct make, model, "modelYear", updated_on from complaints) last
     on last_update.make = models_for_make_year.make
     and last_update.model = models_for_make_year.model
     and last_update."modelYear" = models_for_make_year."modelYear"
-where models_for_make_year."modelYear" >= '{date.today().year - 6}'
+where models_for_make_year."modelYear"::int >= EXTRACT(YEAR from current_date) - 6
 and (CURRENT_DATE - last_update.updated_on::Date) > 5
-""").sample(500)
+""")
+sample_size = min(500,len(make_model_year))
+make_model_year = make_model_year.sample(sample_size)
 if len(make_model_year) > 0:
-    current_update = make_model_year.sample(500)
     update_complaints(make_model_year)
 print(make_model_year)
 print(f"Stale data randomly updated.")
