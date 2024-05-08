@@ -208,8 +208,9 @@ select
     *,
     rank() over (partition by complaints."odiNumber" order by updated_on desc) rnk
 from complaints
+order by updated_on desc
 )
-select 
+select distinct on ("odiNumber")
     "odiNumber",
     manufacturer,
     crash,
