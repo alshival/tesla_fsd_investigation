@@ -151,7 +151,7 @@ def update_complaints(make_model_year):
     db = pg_connect()
     # add data to database:
     df.to_sql('complaints',db,index=False,if_exists='append')
-    pg_clean_table('complaints')
+    #pg_clean_table('complaints')
 
 ########################################
 # Update Tesla
@@ -196,8 +196,8 @@ if len(make_model_year) > 0:
 print(make_model_year)
 print(f"Stale data randomly updated.")
 
-for t in pg_tables():
-    pg_clean_table(t)
+# for t in pg_tables():
+#     pg_clean_table(t)
 
 pg_execute(""" 
 DROP TABLE IF EXISTS complaints_backup
