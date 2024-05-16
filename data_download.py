@@ -137,10 +137,10 @@ def update_complaints(make_model_year):
         complaints = get_complaints(row['make'],row['model'],row['modelYear'])
         if complaints:
             for c in complaints:
-                c['make'] = row['make']
-                c['model'] = row['model']
-                c['modelYear'] = row['modelYear']
-                c['products'] = json.dumps(c['products'])
+                c['make'] = row.get('make',None)
+                c['model'] = row.get('model',None)
+                c['modelYear'] = row.get('modelYear',None)
+                c['products'] = json.dumps(c.get('products',{}))
                 c['updated_on'] = date.today()
                 all_complaints.append(c)
         time.sleep(.5)
