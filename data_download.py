@@ -9,22 +9,46 @@ from config import *
 # Main function to download complaints
 ########################################
 # Function to get complaints from NHTSA API
-def get_complaints(make, model, model_year):
+import requests
+from requests.exceptions import Timeout, RequestException
+import time
+
+# Function to get complaints from NHTSA API
+def get_complaints(make, model, model_year, retries=3, timeout=30):
     # Construct the API URL
     url = f"https://api.nhtsa.gov/complaints/complaintsByVehicle?make={make}&model={model}&modelYear={model_year}"
-    
-    # Make the GET request to the NHTSA API
-    response = requests.get(url)
-    
-    # Check if the request was successful
-    if response.status_code == 200:
-        # Return the JSON response
-        return response.json()['results']
-    elif response.status_code == 400:
-        return None
-    else:
-        # Return an error message
-        return None
+
+    attempt = 0
+
+    while attempt < retries:
+        try:
+            # Make the GET request to the NHTSA API with a timeout
+            response = requests.get(url, timeout=timeout)
+            
+            # Check if the request was successful
+            if response.status_code == 200:
+                # Return the JSON response
+                return response.json().get('results', [])
+            elif response.status_code == 400:
+                return None
+            else:
+                # Return an error message
+                return None
+        
+        except Timeout:
+            # Handle timeout exception
+            attempt += 1
+            print(f"Attempt {attempt} timed out. Retrying...")
+            time.sleep(5)  # wait before retrying
+        except RequestException as e:
+            # Handle other request exceptions
+            print(f"Request failed: {e}")
+            return None
+
+    # If all attempts fail, return None
+    print("All attempts to contact the API have failed.")
+    return None
+
 
 ########################################
 # Update Model Years
@@ -69,7 +93,7 @@ for year in model_years[model_years['modelYear'].astype(int)>=2016]['modelYear']
         print(f'Downloading makes for year {year}')
         makes_for_year = get_makes_for_year(year)
         makes_for_year['updated_on'] = date.today()
-        makes_for_year.to_sql('makes_for_year',db,index=False,if_exists='replace')
+        makes_for_year.to_sql('makes_for_year',db,index=False,if_exists='append')
 
 db.dispose()
 # Remove duplicate rows from the table
@@ -131,9 +155,9 @@ if len(all_models) > 0:
 # Update Complaints
 ########################################
 def update_complaints(make_model_year):
-    all_complaints = []
     for _,row in make_model_year.iterrows():
-        print(f'Downloading data for {row['make']} {row['modelYear']} {row['model']}')
+        make_complaints = []
+        print(f'Downloading data for {row['modelYear']} {row['make']} {row['model']}')
         complaints = get_complaints(row['make'],row['model'],row['modelYear'])
         if complaints:
             for c in complaints:
@@ -142,30 +166,36 @@ def update_complaints(make_model_year):
                 c['modelYear'] = row.get('modelYear',None)
                 c['products'] = json.dumps(c.get('products',{}))
                 c['updated_on'] = date.today()
-                all_complaints.append(c)
-        time.sleep(.5)
-
-    df = pd.DataFrame(all_complaints)
-    df.to_pickle("all_complaints.pkl")
-
-    db = pg_connect()
-    # add data to database:
-    df.to_sql('complaints',db,index=False,if_exists='append')
-    #pg_clean_table('complaints')
+                make_complaints.append(c)
+                make_df = pd.DataFrame(make_complaints)
+            db = pg_connect()
+            make_df.to_sql('complaints',db,index=False,if_exists='append')
+            print(f'Complaint data for {row['modelYear']} {row['make']} {row['model']} updated')
+            db.dispose()
+        time.sleep(1)
 
 ########################################
 # Update Tesla
 ########################################
-make_model_year = pg_query(""" 
+if 'complaints' in pg_tables():
+    make_model_year = pg_query(""" 
+    select distinct
+        models_for_make_year.make,models_for_make_year."modelYear",models_for_make_year.model
+    from models_for_make_year
+    join (select distinct make, model, "modelYear", updated_on from complaints) last_update
+        on last_update.make = models_for_make_year.make
+        and last_update.model = models_for_make_year.model
+        and last_update."modelYear" = models_for_make_year."modelYear"
+    where models_for_make_year."modelYear"::int >= extract(year from current_date) - 5
+    and models_for_make_year.make ='TESLA'
+    """)
+else:
+    make_model_year = pg_query("""
 select distinct
     models_for_make_year.make,models_for_make_year."modelYear",models_for_make_year.model
 from models_for_make_year
-join (select distinct make, model, "modelYear", updated_on from complaints) last_update
-    on last_update.make = models_for_make_year.make
-    and last_update.model = models_for_make_year.model
-    and last_update."modelYear" = models_for_make_year."modelYear"
-where models_for_make_year."modelYear" >= '2016'
-and models_for_make_year.make ='TESLA'
+    where models_for_make_year."modelYear"::int >= extract(year from current_date) - 5
+    and models_for_make_year.make ='TESLA'
 """)
 
 update_complaints(make_model_year)
@@ -179,15 +209,23 @@ We randomly sample make/model/modelYear data that has not been updated in the pa
 Each day this is run, 500 such combinations are updated
 """
 make_model_year = pg_query(f""" 
-select distinct
-    models_for_make_year.make,models_for_make_year."modelYear",models_for_make_year.model
-from models_for_make_year
-join (select distinct make, model, "modelYear", updated_on from complaints) last_update
-    on last_update.make = models_for_make_year.make
-    and last_update.model = models_for_make_year.model
-    and last_update."modelYear" = models_for_make_year."modelYear"
-where models_for_make_year."modelYear"::int >= EXTRACT(YEAR from current_date) - 6
-and (CURRENT_DATE - last_update.updated_on::Date) > 5
+SELECT DISTINCT
+    models_for_make_year.make,
+    models_for_make_year."modelYear",
+    models_for_make_year.model
+FROM models_for_make_year
+LEFT JOIN (
+    SELECT DISTINCT make, model, "modelYear", updated_on 
+    FROM complaints
+) last_update
+    ON last_update.make = models_for_make_year.make
+    AND last_update.model = models_for_make_year.model
+    AND last_update."modelYear" = models_for_make_year."modelYear"
+WHERE models_for_make_year."modelYear"::int >= EXTRACT(YEAR FROM current_date) - 5
+AND (
+    last_update.updated_on IS NULL 
+    OR (CURRENT_DATE - last_update.updated_on::Date) > 5
+)
 """)
 sample_size = min(500,len(make_model_year))
 make_model_year = make_model_year.sample(sample_size)

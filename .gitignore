@@ -2,3 +2,6 @@
 config.yaml
 all_complaints.pkl
 __pycache__/config.cpython-312.pyc
+/target
+/openai_dev
+/openai
