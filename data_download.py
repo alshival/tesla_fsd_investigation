@@ -54,14 +54,36 @@ def get_complaints(make, model, model_year, retries=3, timeout=30):
 # Update Model Years
 ########################################
 # Function to get all Model Years
-def get_model_years():
+# Function to get all Model Years
+def get_model_years(retries=3, timeout=30):
     url = "https://api.nhtsa.gov/products/vehicle/modelYears?issueType=c"
-    response = requests.get(url)
-    if response.status_code == 200:
-        return pd.DataFrame(response.json()['results'])
-    else:
-        return f"Error: {response.status_code}"
+    
+    attempt = 0
 
+    while attempt < retries:
+        try:
+            # Make the GET request to the NHTSA API with a timeout
+            response = requests.get(url, timeout=timeout)
+            
+            # Check if the request was successful
+            if response.status_code == 200:
+                return pd.DataFrame(response.json().get('results', []))
+            else:
+                return f"Error: {response.status_code}"
+        
+        except Timeout:
+            # Handle timeout exception
+            attempt += 1
+            print(f"Attempt {attempt} timed out. Retrying...")
+            time.sleep(5)  # wait before retrying
+        except RequestException as e:
+            # Handle other request exceptions
+            print(f"Request failed: {e}")
+            return None
+
+    # If all attempts fail, return an error message
+    print("All attempts to contact the API have failed.")
+    return "Error: All attempts to contact the API have failed."
 
 # Fetch model years
 model_years = get_model_years()
@@ -74,43 +96,104 @@ model_years.to_sql('model_years',db,index=False,if_exists='replace')
 # Update Makes
 ########################################
 # Function to get all Makes for the Model Year
-def get_makes_for_year(year):
+# Function to get makes for a specific year
+def get_makes_for_year(year, retries=3, timeout=30):
     url = f"https://api.nhtsa.gov/products/vehicle/makes?modelYear={year}&issueType=c"
-    response = requests.get(url)
-    if response.status_code == 200:
-        return pd.DataFrame(response.json()['results'])
-    else:
-        return f"Error: {response.status_code}"
+    
+    attempt = 0
+
+    while attempt < retries:
+        try:
+            # Make the GET request to the NHTSA API with a timeout
+            response = requests.get(url, timeout=timeout)
+            
+            # Check if the request was successful
+            if response.status_code == 200:
+                return pd.DataFrame(response.json().get('results', []))
+            else:
+                return f"Error: {response.status_code}"
+        
+        except Timeout:
+            # Handle timeout exception
+            attempt += 1
+            print(f"Attempt {attempt} timed out. Retrying...")
+            time.sleep(5)  # wait before retrying
+        except RequestException as e:
+            # Handle other request exceptions
+            print(f"Request failed: {e}")
+            return None
+
+    # If all attempts fail, return an error message
+    print("All attempts to contact the API have failed.")
+    return "Error: All attempts to contact the API have failed."
 
 db = pg_connect()
 if 'makes_for_year' in pg_tables():
-    years = pg_query('select distinct "modelYear" from makes_for_year')['modelYear'].to_list()
+    years_to_exclude = pg_query('select distinct "modelYear" from makes_for_year')['modelYear'].to_list()
 else:
-    years = []
+    years_to_exclude = []
 
 for year in model_years[model_years['modelYear'].astype(int)>=2016]['modelYear']:
-    if (year >= str(date.today().year)) | (year not in years):
+    if (year >= str(date.today().year)) | (year not in years_to_exclude):
         print(f'Downloading makes for year {year}')
         makes_for_year = get_makes_for_year(year)
         makes_for_year['updated_on'] = date.today()
         makes_for_year.to_sql('makes_for_year',db,index=False,if_exists='append')
-
 db.dispose()
 # Remove duplicate rows from the table
-pg_clean_table('makes_for_year')
+pg_execute(""" 
+DROP TABLE IF EXISTS makes_for_year_backup
+""")
+pg_execute(""" 
+CREATE TABLE makes_for_year_backup AS
+with tbl as (
+select 
+    *,
+    rank() over (partition by "modelYear",make order by updated_on desc) rnk
+from makes_for_year
+order by updated_on desc
+)
+select distinct on ("modelYear","make")
+    "modelYear",
+    "make",
+    "updated_on"
+from tbl where rnk = 1
+""")
+pg_execute(f"DELETE FROM makes_for_year;")
+
+pg_execute(f"INSERT INTO makes_for_year SELECT * FROM makes_for_year_backup;")
+pg_execute(f"DROP TABLE makes_for_year_backup;")
+print(f"makes_for_year table cleaned")
 
 ########################################
 # Update Models
 ########################################
 # Function to get all Models for the Make and Model Year
-def get_models_for_make_year(make, year):
+def get_models_for_make_year(make, year, retries=3, timeout=30):
     url = f"https://api.nhtsa.gov/products/vehicle/models?modelYear={year}&make={make}&issueType=c"
-    response = requests.get(url)
-    if response.status_code == 200:
-        return response.json()['results']
-    else:
-        return f"Error: {response.status_code}"
     
+    attempt = 0
+
+    while attempt < retries:
+        try:
+            response = requests.get(url, timeout=timeout)
+            
+            if response.status_code == 200:
+                return response.json().get('results', [])
+            else:
+                return f"Error: {response.status_code}"
+        
+        except Timeout:
+            attempt += 1
+            print(f"Attempt {attempt} timed out. Retrying...")
+            time.sleep(5)
+        except RequestException as e:
+            print(f"Request failed: {e}")
+            return None
+
+    print("All attempts to contact the API have failed.")
+    return "Error: All attempts to contact the API have failed."
+
 if 'models_for_make_year' in pg_tables():
     makes_for_year  = pg_query(""" 
     select distinct 
@@ -150,7 +233,31 @@ if len(all_models) > 0:
     db = pg_connect()
     df['updated_on'] = date.today()
     df.to_sql('models_for_make_year',db,index=False,if_exists='append')
-    pg_clean_table('models_for_make_year')
+    
+    pg_execute(""" 
+    DROP TABLE IF EXISTS models_for_make_year_backup
+    """)
+    pg_execute(""" 
+    CREATE TABLE models_for_make_year_backup AS
+    with tbl as (
+    select 
+        *,
+        rank() over (partition by "modelYear",make,model order by updated_on desc) rnk
+    from models_for_make_year
+    order by updated_on desc
+    )
+    select distinct on ("modelYear","make","model")
+        "modelYear",
+        "make",
+        "model",
+        "updated_on"
+    from tbl where rnk = 1
+    """)
+    pg_execute(f"DELETE FROM models_for_make_year;")
+
+    pg_execute(f"INSERT INTO models_for_make_year SELECT * FROM models_for_make_year_backup;")
+    pg_execute(f"DROP TABLE models_for_make_year_backup;")
+    print(f"models_for_make_year table cleaned")
 ########################################
 # Update Complaints
 ########################################
@@ -182,7 +289,7 @@ if 'complaints' in pg_tables():
     select distinct
         models_for_make_year.make,models_for_make_year."modelYear",models_for_make_year.model
     from models_for_make_year
-    join (select distinct make, model, "modelYear", updated_on from complaints) last_update
+    left join (select distinct make, model, "modelYear", updated_on from complaints) last_update
         on last_update.make = models_for_make_year.make
         and last_update.model = models_for_make_year.model
         and last_update."modelYear" = models_for_make_year."modelYear"
