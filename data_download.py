@@ -196,15 +196,19 @@ def get_models_for_make_year(make, year, retries=3, timeout=30):
 
 if 'models_for_make_year' in pg_tables():
     makes_for_year  = pg_query(""" 
-    select distinct 
-        "modelYear",
-        make
-    from makes_for_year 
-    where "modelYear"::int >= EXTRACT(YEAR from CURRENT_DATE)::INT 
-    and make||"modelYear" in (
-        select make||"modelYear" from models_for_make_year
-        where CURRENT_DATE - updated_on::Date >7
-    )
+select distinct 
+	"modelYear",
+	make
+from makes_for_year 
+where "modelYear"::int >= extract(year from current_date)
+union all
+select distinct 
+	"modelYear",
+	make
+from makes_for_year 
+where "modelYear"::int >= extract(year from current_date) - 5
+and "modelYear"::int < extract(year from current_date)
+and ("modelYear",make) not in (select "modelYear",make from models_for_make_year)
         """)
 else:
     makes_for_year  = pg_query(""" 
@@ -212,51 +216,29 @@ else:
         "modelYear",
         make
     from makes_for_year 
-    where "modelYear"::int >= 2016
+    where "modelYear"::int >= 2019
         """)
 
 all_models = []
 if len(makes_for_year) > 0:
     sample_size = min(500,len(makes_for_year))
     makes_for_year = makes_for_year.sample(sample_size)
+    db = pg_connect()
     for _,row in makes_for_year.iterrows():
         print(f"Downloading {row['make']} {row['modelYear']} models")
         # Download models
-        download = get_models_for_make_year(row['make'],str(row['modelYear']))
+        try:
+            download = get_models_for_make_year(row['make'],str(row['modelYear']))
+        except Exception as e:
+            print("Download failed. Will try again next update.")
         # add to list
         print(download)
-        all_models.extend(download)
-        time.sleep(.5)
-if len(all_models) > 0:
-    df = pd.DataFrame(all_models)
-    # Save to database
-    db = pg_connect()
-    df['updated_on'] = date.today()
-    df.to_sql('models_for_make_year',db,index=False,if_exists='append')
-    
-    pg_execute(""" 
-    DROP TABLE IF EXISTS models_for_make_year_backup
-    """)
-    pg_execute(""" 
-    CREATE TABLE models_for_make_year_backup AS
-    with tbl as (
-    select 
-        *,
-        rank() over (partition by "modelYear",make,model order by updated_on desc) rnk
-    from models_for_make_year
-    order by updated_on desc
-    )
-    select distinct on ("modelYear","make","model")
-        "modelYear",
-        "make",
-        "model",
-        "updated_on"
-    from tbl where rnk = 1
-    """)
-    pg_execute(f"DELETE FROM models_for_make_year;")
-
-    pg_execute(f"INSERT INTO models_for_make_year SELECT * FROM models_for_make_year_backup;")
-    pg_execute(f"DROP TABLE models_for_make_year_backup;")
+        payload = pd.DataFrame(download)
+        if len(payload) > 0:
+            payload.to_sql('models_for_make_year',db,index=False, if_exists='append')
+        time.sleep(2)
+    # Clean database
+    pg_clean_table('models_for_make_year')
     print(f"models_for_make_year table cleaned")
 ########################################
 # Update Complaints
@@ -284,20 +266,7 @@ def update_complaints(make_model_year):
 ########################################
 # Update Tesla
 ########################################
-if 'complaints' in pg_tables():
-    make_model_year = pg_query(""" 
-    select distinct
-        models_for_make_year.make,models_for_make_year."modelYear",models_for_make_year.model
-    from models_for_make_year
-    left join (select distinct make, model, "modelYear", updated_on from complaints) last_update
-        on last_update.make = models_for_make_year.make
-        and last_update.model = models_for_make_year.model
-        and last_update."modelYear" = models_for_make_year."modelYear"
-    where models_for_make_year."modelYear"::int >= extract(year from current_date) - 5
-    and models_for_make_year.make ='TESLA'
-    """)
-else:
-    make_model_year = pg_query("""
+make_model_year = pg_query("""
 select distinct
     models_for_make_year.make,models_for_make_year."modelYear",models_for_make_year.model
 from models_for_make_year
@@ -316,26 +285,26 @@ We randomly sample make/model/modelYear data that has not been updated in the pa
 Each day this is run, 500 such combinations are updated
 """
 make_model_year = pg_query(f""" 
-SELECT DISTINCT
-    models_for_make_year.make,
-    models_for_make_year."modelYear",
-    models_for_make_year.model
-FROM models_for_make_year
-LEFT JOIN (
-    SELECT DISTINCT make, model, "modelYear", updated_on 
-    FROM complaints
-) last_update
-    ON last_update.make = models_for_make_year.make
-    AND last_update.model = models_for_make_year.model
-    AND last_update."modelYear" = models_for_make_year."modelYear"
-WHERE models_for_make_year."modelYear"::int >= EXTRACT(YEAR FROM current_date) - 5
-AND (
-    last_update.updated_on IS NULL 
-    OR (CURRENT_DATE - last_update.updated_on::Date) > 5
+with refresh_table as (
+    SELECT DISTINCT
+        make,model,"modelYear",random()
+    from complaints
+    where "modelYear"::int >= EXTRACT(YEAR FROM current_date) - 5
+    and (CURRENT_DATE - updated_on::Date) > 5
+    order by RANDOM() 
+    limit 700
+),
+new_table as (
+    select distinct
+            make,model,"modelYear",random()
+    from models_for_make_year
+        where (make,model,"modelYear") not in (select make,model,"modelYear" from complaints)
+    order by random() limit 200
 )
+select make,model,"modelYear" from refresh_table
+union all
+select make,model,"modelYear" from new_table
 """)
-sample_size = min(500,len(make_model_year))
-make_model_year = make_model_year.sample(sample_size)
 if len(make_model_year) > 0:
     update_complaints(make_model_year)
 print(make_model_year)
