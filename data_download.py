@@ -436,7 +436,7 @@ where "modelYear"::int >= 2019
 import subprocess
 
 # Define the PowerShell command
-command = 'kaggle datasets version -p .\\kaggle_files\\ -m "Test update"'
+command = 'kaggle datasets version -p .\\kaggle_files\\ -m "Daily update"'
 
 # Execute the PowerShell command
 result = subprocess.run(["powershell", "-Command", command], capture_output=True, text=True)
