@@ -6,3 +6,4 @@ __pycache__/config.cpython-312.pyc
 /openai_dev
 /openai
 kaggle_files/complaints.csv
+kaggle_files/car_models.csv
