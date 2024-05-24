@@ -57,9 +57,10 @@ def pg_execute_query(query):
 
     return data
 
-def pg_execute(query):
+def pg_execute(query,engine=None):
     sql = text(query)
-    engine = pg_connect()
+    if engine is None:
+        engine = pg_connect()
     with engine.connect() as connection:
         result = connection.execute(sql)
         connection.commit()

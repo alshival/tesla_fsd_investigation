@@ -92,6 +92,7 @@ model_years = get_model_years()
 db = pg_connect()
 model_years.to_sql('model_years',db,index=False,if_exists='replace')
 
+
 ########################################
 # Update Makes
 ########################################
@@ -137,33 +138,38 @@ for year in model_years[model_years['modelYear'].astype(int)>=2016]['modelYear']
     if (year >= str(date.today().year)) | (year not in years_to_exclude):
         print(f'Downloading makes for year {year}')
         makes_for_year = get_makes_for_year(year)
-        makes_for_year['updated_on'] = date.today()
+        makes_for_year
         makes_for_year.to_sql('makes_for_year',db,index=False,if_exists='append')
 db.dispose()
 # Remove duplicate rows from the table
-pg_execute(""" 
-DROP TABLE IF EXISTS makes_for_year_backup
-""")
-pg_execute(""" 
-CREATE TABLE makes_for_year_backup AS
-with tbl as (
-select 
-    *,
-    rank() over (partition by "modelYear",make order by updated_on desc) rnk
-from makes_for_year
-order by updated_on desc
-)
-select distinct on ("modelYear","make")
-    "modelYear",
-    "make",
-    "updated_on"
-from tbl where rnk = 1
-""")
-pg_execute(f"DELETE FROM makes_for_year;")
+pg_clean_table('makes_for_year')
 
-pg_execute(f"INSERT INTO makes_for_year SELECT * FROM makes_for_year_backup;")
-pg_execute(f"DROP TABLE makes_for_year_backup;")
-print(f"makes_for_year table cleaned")
+# Create table to track model updates
+if 'model_download_tracker' not in pg_tables():
+    query = """
+create table model_download_tracker as
+select
+	*,
+	CURRENT_TIMESTAMP - interval '1000 years' as models_last_updated,
+    0 as models_downloaded
+from makes_for_year
+"""
+    pg_execute(query)
+    print("model_download_tracker table created")
+
+# Update model download tracker
+pg_execute("""
+INSERT INTO model_download_tracker
+select distinct on ("modelYear",make)
+	"modelYear",
+	make,
+	CURRENT_TIMESTAMP - interval '1000 years' as models_last_updated,
+    0 as models_downloaded
+from makes_for_year
+where ("modelYear","make") not in (select "modelYear",make from model_download_tracker)
+""")
+print("model_download_tracker updated")
+
 
 ########################################
 # Update Models
@@ -194,35 +200,38 @@ def get_models_for_make_year(make, year, retries=3, timeout=30):
     print("All attempts to contact the API have failed.")
     return "Error: All attempts to contact the API have failed."
 
-if 'models_for_make_year' in pg_tables():
-    makes_for_year  = pg_query(""" 
+makes_for_year = pg_query("""
 select distinct 
 	"modelYear",
-	make
-from makes_for_year 
-where "modelYear"::int >= extract(year from current_date)
+	make,
+    models_last_updated,
+    models_downloaded
+from model_download_tracker 
+where "modelYear"::int >= extract(year from current_date) 
+and "modelYear"::int <= extract(year from current_date) + 1
+and models_last_updated < CURRENT_DATE - INTERVAL '7 days'
 union all
-select distinct 
+select
 	"modelYear",
-	make
-from makes_for_year 
-where "modelYear"::int >= extract(year from current_date) - 5
-and "modelYear"::int < extract(year from current_date)
-and ("modelYear",make) not in (select "modelYear",make from models_for_make_year)
-        """)
-else:
-    makes_for_year  = pg_query(""" 
-    select distinct 
-        "modelYear",
-        make
-    from makes_for_year 
-    where "modelYear"::int >= 2019
-        """)
+	make,
+    models_last_updated,
+    models_downloaded
+from (
+	SELECT DISTINCT
+		*,
+		random()
+	FROM model_download_tracker
+	WHERE "modelYear"::int < EXTRACT(YEAR FROM CURRENT_DATE)
+	  AND "modelYear"::int >= EXTRACT(YEAR FROM CURRENT_DATE) - 5
+	  AND models_last_updated < CURRENT_DATE - INTERVAL '30 days'
+      AND models_downloaded = 0
+	order by random() desc
+	limit 500
+) tbl      
+""")
 
 all_models = []
 if len(makes_for_year) > 0:
-    sample_size = min(500,len(makes_for_year))
-    makes_for_year = makes_for_year.sample(sample_size)
     db = pg_connect()
     for _,row in makes_for_year.iterrows():
         print(f"Downloading {row['make']} {row['modelYear']} models")
@@ -236,13 +245,55 @@ if len(makes_for_year) > 0:
         payload = pd.DataFrame(download)
         if len(payload) > 0:
             payload.to_sql('models_for_make_year',db,index=False, if_exists='append')
+        # Update model_download_tracker
+        with db.connect() as connection:
+            query = text('''
+                update model_download_tracker
+                set models_last_updated = current_timestamp,
+                    models_downloaded = :x
+                where "modelYear" = :y and make = :z
+                ''')
+            connection.execute(query,{'x':len(payload),'y':str(row['modelYear']),'z':row['make']})
+            connection.commit()
+        # Done.    
+        print(f"{row['modelYear']} {row['make']} models updated: {payload.shape[0]} new models")
         time.sleep(2)
+    db.dispose()
     # Clean database
     pg_clean_table('models_for_make_year')
     print(f"models_for_make_year table cleaned")
+
 ########################################
 # Update Complaints
 ########################################
+# Create table to track complaint updates
+if 'complaints_download_tracker' not in pg_tables():
+    query = """
+create table complaints_download_tracker as
+select
+	*,
+	CURRENT_TIMESTAMP - interval '1000 years' as complaints_last_updated,
+    0 as total_complaints
+from models_for_make_year
+"""
+    pg_execute(query)
+    print("complaints_download_tracker table created")
+
+# Update complaint download tracker
+pg_execute("""
+INSERT INTO complaints_download_tracker
+select distinct on ("modelYear","make","model")
+	"modelYear",
+	make,
+    "model",
+	CURRENT_TIMESTAMP - interval '1000 years' as complaints_last_updated,
+    0 as total_complaints
+from models_for_make_year
+where ("modelYear","make","model") not in (select "modelYear","make","model" from complaints_download_tracker)
+""")
+
+print("complaints_download_tracker updated")
+
 def update_complaints(make_model_year):
     for _,row in make_model_year.iterrows():
         make_complaints = []
@@ -254,103 +305,71 @@ def update_complaints(make_model_year):
                 c['model'] = row.get('model',None)
                 c['modelYear'] = row.get('modelYear',None)
                 c['products'] = json.dumps(c.get('products',{}))
-                c['updated_on'] = date.today()
                 make_complaints.append(c)
-                make_df = pd.DataFrame(make_complaints)
-            db = pg_connect()
+        make_df = pd.DataFrame(make_complaints)
+        db = pg_connect()
+        if len(make_df) > 0:
             make_df.to_sql('complaints',db,index=False,if_exists='append')
-            print(f'Complaint data for {row['modelYear']} {row['make']} {row['model']} updated')
-            db.dispose()
+        # update complaints download tracker
+        with db.connect() as connection:
+            query = text('''
+            update complaints_download_tracker
+            set complaints_last_updated = current_timestamp, total_complaints = :w
+            where "modelYear" = :x and make = :y and model = :z
+            ''')
+            connection.execute(query,{'w':make_df.shape[0],'x': str(row['modelYear']),'y':row['make'],'z':row['model']})
+            connection.commit()
+        db.dispose()
+        # Done.
+        print(f'Complaint data for {row['modelYear']} {row['make']} {row['model']} updated: {make_df.shape[0]} total complaints')
         time.sleep(1)
 
-########################################
-# Update Tesla
-########################################
-make_model_year = pg_query("""
-select distinct
-    models_for_make_year.make,models_for_make_year."modelYear",models_for_make_year.model
-from models_for_make_year
-    where models_for_make_year."modelYear"::int >= extract(year from current_date) - 5
-    and models_for_make_year.make ='TESLA'
-""")
-
-update_complaints(make_model_year)
-print(f"Tesla data downloaded.")
-
-########################################
-# Update rest on random sample cadence
-########################################
-"""
-We randomly sample make/model/modelYear data that has not been updated in the past week.
-Each day this is run, 500 such combinations are updated
-"""
 make_model_year = pg_query(f""" 
-with refresh_table as (
-    SELECT DISTINCT
-        make,model,"modelYear",random()
-    from complaints
-    where "modelYear"::int >= EXTRACT(YEAR FROM current_date) - 5
-    and (CURRENT_DATE - updated_on::Date) > 5
-    order by RANDOM() 
-    limit 700
-),
-new_table as (
-    select distinct
-            make,model,"modelYear",random()
-    from models_for_make_year
-        where (make,model,"modelYear") not in (select make,model,"modelYear" from complaints)
-    order by random() limit 200
+(
+    select 
+        * 
+    from complaints_download_tracker
+    where make='TESLA' and "modelYear"::int >= extract(year from current_date) - 5
+    and extract('days' from current_timestamp - complaints_last_updated) > 0
 )
-select make,model,"modelYear" from refresh_table
 union all
-select make,model,"modelYear" from new_table
+(
+    select
+        "modelYear",
+        "make",
+        "model",
+        "complaints_last_updated",
+        "total_complaints"
+    from (
+        select 
+            *,
+            random()
+        from complaints_download_tracker
+        where make !='TESLA'
+        and "modelYear"::int >= extract(year from current_date) - 5
+        and extract('days' from current_timestamp - complaints_last_updated) > 3
+    ) tbl
+    order by random() limit 400
+)
 """)
 if len(make_model_year) > 0:
     update_complaints(make_model_year)
 print(make_model_year)
 print(f"Stale data randomly updated.")
 
-# for t in pg_tables():
-#     pg_clean_table(t)
 
-pg_execute(""" 
-DROP TABLE IF EXISTS complaints_backup
-""")
-
-pg_execute(""" 
-CREATE TABLE complaints_backup AS
-with tbl as (
-select 
-    *,
-    rank() over (partition by complaints."odiNumber" order by updated_on desc) rnk
-from complaints
-order by updated_on desc
-)
+pg_execute("drop table if exists complaints_backup")
+pg_execute("""
+create table complaints_backup as
 select distinct on ("odiNumber")
-    "odiNumber",
-    manufacturer,
-    crash,
-    fire,
-    "numberOfInjuries",
-    "numberOfDeaths",
-    "dateOfIncident",
-    "dateComplaintFiled",
-    "vin",
-    "components",
-    "summary",
-    "products",
-    "make",
-    "model",
-    "modelYear",
-    "updated_on"
-from tbl where rnk = 1
+    *
+from complaints 
 """)
+pg_execute("delete from complaints")
+pg_execute('insert into complaints select * from complaints_backup')
+pg_execute('drop table complaints_backup')
 
-pg_execute(f"DELETE FROM complaints;")
-
-pg_execute(f"INSERT INTO complaints SELECT * FROM complaints_backup;")
-pg_execute(f"DROP TABLE complaints_backup;")
-print(f"Stale data from complaints")
+print("Complaints data table cleaned.")
 
 ##########################
 # Update car_sales
