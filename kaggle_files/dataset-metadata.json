@@ -13,7 +13,7 @@
     }
   ],
   "homepage": "https://alshival.com",
-  "description": "National Highway Traffic Safety Administration (NHTSA) complaints filed by customers, by make, model, and model year.",
+  "description": "This dataset contains customer complaints filed with the National Highway Traffic Safety Administration (NHTSA) concerning various vehicle makes and models. The data spans all makes and models from the year 2019 onwards, with updates limited to the last five model years. Each record provides detailed information on the complaint, including the manufacturer, whether a crash or fire occurred, the number of injuries or deaths, dates of the incident and complaint filing, vehicle identification number (VIN), components involved, a summary of the complaint, and the vehicle's make, model, and model year.",
   "resources": [
     {
       "path": "complaints.csv",
