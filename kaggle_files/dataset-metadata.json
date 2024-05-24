@@ -1,0 +1,118 @@
+{
+  "title": "NHTSA Customer Complaints",
+  "id": "alshival/NHTSA-Complaints",
+  "licenses": [
+    {
+      "name": "CC0-1.0"
+    }
+  ],
+  "description": "National Highway Traffic Safety Administration (NHTSA) complaints filed by customers, by make, model, and model year.",
+  "resources": [
+    {
+      "path": "complaints.csv",
+      "description": "National Highway Traffic Safety Administration (NHTSA) complaints filed by customers, by make, model, and model year.",
+      "schema": {
+        "fields": [
+          {
+            "name": "odiNumber",
+            "description": "Unique identifier for the complaint",
+            "type": "id"
+          },
+          {
+            "name": "manufacturer",
+            "description": "Name of the manufacturer",
+            "type": "string"
+          },
+          {
+            "name": "crash",
+            "description": "Indicates whether a crash occurred (true/false)",
+            "type": "boolean"
+          },
+          {
+            "name": "fire",
+            "description": "Indicates whether a fire occurred (true/false)",
+            "type": "boolean"
+          },
+          {
+            "name": "numberOfInjuries",
+            "description": "Number of injuries reported",
+            "type": "integer"
+          },
+          {
+            "name": "numberOfDeaths",
+            "description": "Number of deaths reported",
+            "type": "integer"
+          },
+          {
+            "name": "dateOfIncident",
+            "description": "Date when the incident occurred",
+            "type": "datetime"
+          },
+          {
+            "name": "dateComplaintFiled",
+            "description": "Date when the complaint was filed",
+            "type": "datetime"
+          },
+          {
+            "name": "vin",
+            "description": "Vehicle Identification Number",
+            "type": "string"
+          },
+          {
+            "name": "components",
+            "description": "Vehicle components involved in the complaint",
+            "type": "string"
+          },
+          {
+            "name": "summary",
+            "description": "Summary of the complaint",
+            "type": "string"
+          },
+          {
+            "name": "products",
+            "description": "Products involved in the complaint",
+            "type": "string"
+          },
+          {
+            "name": "make",
+            "description": "Vehicle make",
+            "type": "string"
+          },
+          {
+            "name": "model",
+            "description": "Vehicle model",
+            "type": "string"
+          },
+          {
+            "name": "modelYear",
+            "description": "Vehicle model year",
+            "type": "integer"
+          }
+        ]
+      }
+    },
+    {
+      "path": "car_models.csv",
+      "description": "A list of all 2019-2024 car models in the NHTSA database. Includes models with no complaints on file.",
+      "schema": {
+        "fields": [
+          {
+            "name": "modelYear",
+            "description": "Vehicle model year",
+            "type": "integer"
+          },
+          {
+            "name": "make",
+            "description": "Vehicle make",
+            "type": "string"
+          },
+          {
+            "name": "model",
+            "description": "Vehicle model",
+            "type": "string"
+          }
+        ]
+      }
+    }
+  ]
+}

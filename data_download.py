@@ -418,3 +418,29 @@ UPDATE car_sales
 SET make = REPLACE(make, 'MERCEDES BENZ', 'MERCEDES-BENZ')
 WHERE make = 'MERCEDES BENZ';
 """)
+
+
+####################
+# Kagle Update
+####################
+import os
+dataDir = 'kaggle_files/'
+pg_query("select distinct on (\"odiNumber\") * from complaints").to_csv(os.path.join(dataDir,'complaints.csv'),index=False)
+pg_query("""
+select
+	*
+from models_for_make_year
+where "modelYear"::int >= 2019
+""").to_csv(os.path.join(dataDir,'car_models.csv'),index=False)
+
+import subprocess
+
+# Define the PowerShell command
+command = 'kaggle datasets version -p .\\kaggle_files\\ -m "Test update"'
+
+# Execute the PowerShell command
+result = subprocess.run(["powershell", "-Command", command], capture_output=True, text=True)
+
+# Print the output and error (if any)
+print("Output:", result.stdout)
+print("Error:", result.stderr)
