@@ -6,6 +6,13 @@
       "name": "CC0-1.0"
     }
   ],
+  "contributors": [
+    {
+      "title": "Alshival's Data Service",
+      "role": "author"
+    }
+  ],
+  "homepage": "https://alshival.com",
   "description": "National Highway Traffic Safety Administration (NHTSA) complaints filed by customers, by make, model, and model year.",
   "resources": [
     {
