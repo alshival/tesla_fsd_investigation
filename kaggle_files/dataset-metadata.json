@@ -92,7 +92,7 @@
           },
           {
             "name": "modelYear",
-            "description": "Vehicle model year",
+            "description": "Vehicle model year, 9999 if Unknown or N/A",
             "type": "integer"
           }
         ]
@@ -100,12 +100,12 @@
     },
     {
       "path": "car_models.csv",
-      "description": "A list of all 2019-2024 car models in the NHTSA database. Includes models with no complaints on file.",
+      "description": "A list of car models in the NHTSA database since 2019. Includes models with no complaints on file.",
       "schema": {
         "fields": [
           {
             "name": "modelYear",
-            "description": "Vehicle model year",
+            "description": "Vehicle model year, 9999 if Unknown or N/A",
             "type": "integer"
           },
           {
@@ -117,6 +117,281 @@
             "name": "model",
             "description": "Vehicle model",
             "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "path": "ratings.csv",
+      "description": "NHTSA safety ratings for 2019-Present vehicle models.",
+      "schema": {
+        "fields": [
+          {
+            "name": "OverallRating",
+            "description": "Overall Rating",
+            "type": "string"
+          },
+          {
+            "name":"OverallFrontCrashRating",
+            "description":"Front crash rating",
+            "type":"string"
+          },
+          {
+            "name": "FrontCrashDriversideRating",
+            "description": "Front crash driverside rating",
+            "type": "string"
+          },
+          {
+            "name": "FrontCrashPassengersideRating",
+            "description": "Front crash passengerside rating",
+            "type": "string"
+          },
+          {
+            "name": "OverallSideCrashRating",
+            "description": "Overall Side Crash Rating",
+            "type": "string"
+          },
+          {
+            "name": "SideCrashDriversideRating",
+            "description": "Side crash driverside rating",
+            "type": "string"
+          },
+          {
+            "name": "SideCrashPassengersideRating",
+            "description": "Side crash passengerside rating",
+            "type": "string"
+          },
+          {
+            "name": "combinedSideBarrierAndPoleRating-Front",
+            "description": "Combined side barrier and pole rating - front",
+            "type": "string"
+          },
+          {
+            "name": "combinedSideBarrierAndPoleRating-Rear",
+            "description": "Combined side barrier and pole rating - rear",
+            "type": "string"
+          },
+          {
+            "name": "sideBarrierRating-Overall",
+            "description": "Overall side barrier rating",
+            "type": "string"
+          },
+          {
+            "name": "RolloverRating",
+            "description": "Rollover Rating",
+            "type": "string"
+          },
+          {
+            "name": "RolloverRating2",
+            "description": "2nd Rollover Rating",
+            "type": "string"
+          },
+          {
+            "name": "RolloverPossibility",
+            "description": "Rollover possiblity",
+            "type": "decimal"
+          },
+          {
+            "name": "RolloverPossibility2",
+            "description": "2nd rollover possiblity",
+            "type": "decimal"
+          },
+          {
+            "name": "dynamicTipResult",
+            "description": "Dynamic Tip Result",
+            "type": "string"
+          },
+          {
+            "name": "SidePoleCrashRating",
+            "description": "Side pole crash rating",
+            "type": "string"
+          },
+          {
+            "name": "NHTSAElectronicStabilityControl",
+            "description": "NHTSA Electronic Stability Control",
+            "type": "string"
+          },
+          {
+            "name": "NHTSAForwardCollisionWarning",
+            "description": "NHTSA forward collision warning",
+            "type": "string"
+          },
+          {
+            "name": "NHTSALaneDepartureWarning",
+            "description": "NHTSA lane departure warning",
+            "type": "string"
+          },
+          {
+            "name": "ModelYear",
+            "description": "Model year, 9999 if Unknown or N/A",
+            "type": "integer"
+          },
+          {
+            "name": "Make",
+            "description": "Make",
+            "type": "string"
+          },
+          {
+            "name": "Model",
+            "description": "Model",
+            "type": "string"
+          },
+          {
+            "name": "VehicleDescription",
+            "description": "Vehicle description",
+            "type": "string"
+          },
+          {
+            "name": "VehicleId",
+            "description": "NHTSA Rating Vehicle ID",
+            "type": "integer"
+          },
+          {
+            "name": "rating_updated_on",
+            "description": "Rating data refresh date",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "path":"recalls.csv",
+      "description": "Recalls issued by the NHTSA for 2019-Present. Only the past 5 model years are being refreshed. New recalls can take up to 45 days to appear in this list. For the latest recall info, check the NHTSA site.",
+      "schema": {
+        "fields": [
+          {
+            "name": "Manufacturer",
+            "description": "Manufacturer",
+            "type": "string"
+          },
+          {
+            "name": "NHTSACampaignNumber",
+            "description": "NHTSA Campaign Number",
+            "type": "string"
+          },
+          {
+            "name": "parkIt",
+            "description": "Park It",
+            "type": "boolean"
+          },
+          {
+            "name": "parkOutSide",
+            "description": "Park Out Side",
+            "type": "boolean"
+          },
+          {
+            "name": "ReportReceivedDate",
+            "description": "Report received date",
+            "type": "string"
+          },
+          {
+            "name": "Component",
+            "description": "Component",
+            "type": "string"
+          },
+          {
+            "name": "Summary",
+            "description": "Recall summary",
+            "type": "string"
+          },
+          {
+            "name": "Consequence",
+            "description": "Consequence",
+            "type": "string"
+          },
+          {
+            "name": "Remedy",
+            "description": "Remedy",
+            "type": "string"
+          },
+          {
+            "name": "Notes",
+            "description": "Notes",
+            "type": "string"
+          },
+          {
+            "name": "ModelYear",
+            "description": "Model year, 9999 if Unknown or N/A",
+            "type": "string"
+          },
+          {
+            "name": "Make",
+            "description": "Make",
+            "type": "string"
+          },
+          {
+            "name": "Model",
+            "description": "Model",
+            "type": "string"
+          },
+          {
+            "name": "NHTSAActionNumber",
+            "description": "NHTSA Action Number (see investigations.csv)",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "path":"investigations.csv",
+      "description": "NHTSA Investigations.",
+      "schema": {
+        "fields": [
+          		
+          {
+            "name": "NHTSA ACTION NUMBER",
+            "description": "NHTSA ID (referred to in recalls.csv)",
+            "type": "string"
+          },
+          {
+            "name": "MAKE",
+            "description": "Vehicle/Equipment Make",
+            "type": "string"
+          },
+          {
+            "name": "MODEL",
+            "description": "Vehicle/Equipment Model",
+            "type": "boolean"
+          },
+          {
+            "name": "YEAR",
+            "description": "Model year, 9999 if Unknown or N/A",
+            "type": "boolean"
+          },
+          {
+            "name": "COMPNAME",
+            "description": "Component name",
+            "type": "string"
+          },
+          {
+            "name": "MFR_NAME",
+            "description": "Manufacturer name",
+            "type": "string"
+          },
+          {
+            "name": "ODATE",
+            "description": "Date Opened (YYYYMMDD)",
+            "type": "string"
+          },
+          {
+            "name": "CDATE",
+            "description": "Date Closed (YYYYMMDD)",
+            "type": "string"
+          },
+          {
+            "name": "CAMPNO",
+            "description": "Recall Campaign Number, if applicable",
+            "type": "string"
+          },
+          {
+            "name": "SUBJECT",
+            "description": "Summary Description",
+            "type": "string"
+          },
+          {
+            "name": "SUMMARY",
+            "description": "Model year",
+            "type": "Summary Detail"
           }
         ]
       }

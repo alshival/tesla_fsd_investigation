@@ -7,3 +7,12 @@ __pycache__/config.cpython-312.pyc
 /openai
 kaggle_files/complaints.csv
 kaggle_files/car_models.csv
+testing.ipynb
+kaggle_files/car_models.csv
+kaggle_files/complaints.csv
+kaggle_files/investigations.csv
+kaggle_files/ratings.csv
+kaggle_files/recalls.csv
+investigations/FLAT_INV.txt
+investigations/FLAT_INV.zip
+investigations/INV.txt
