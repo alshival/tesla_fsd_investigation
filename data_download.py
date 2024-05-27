@@ -222,7 +222,7 @@ from (
 		random()
 	FROM complaints_model_download_tracker
 	WHERE "modelYear"::int < EXTRACT(YEAR FROM CURRENT_DATE)
-	  AND "modelYear"::int >= EXTRACT(YEAR FROM CURRENT_DATE) - 5
+	  AND "modelYear"::int >= EXTRACT(YEAR FROM CURRENT_DATE) - 7
 	  AND models_last_updated < CURRENT_DATE - INTERVAL '15 days'
       AND models_downloaded = 0
 	order by random() desc
@@ -326,7 +326,7 @@ make_model_year = pg_query(f"""
     select 
         * 
     from complaints_download_tracker
-    where make='TESLA' and "modelYear"::int >= extract(year from current_date) - 5
+    where make='TESLA' and "modelYear"::int >= extract(year from current_date) - 7
     and extract('days' from current_timestamp - complaints_last_updated) > 0
 )
 union all
@@ -343,7 +343,7 @@ union all
             random()
         from complaints_download_tracker
         where make !='TESLA'
-        and "modelYear"::int >= extract(year from current_date) - 5
+        and "modelYear"::int >= extract(year from current_date) - 7
         and extract('days' from current_timestamp - complaints_last_updated) > 3
     ) tbl
     order by random() limit 400
@@ -543,7 +543,7 @@ select
     *
 from ratings_model_download_tracker
 where models_last_updated < current_date - interval '15 days'
-and "ModelYear"::int >= extract(year from current_date) - 5
+and "ModelYear"::int >= extract(year from current_date) - 7
 """)
 
 db = pg_connect()
@@ -939,7 +939,7 @@ select
     *
 from recalls_model_download_tracker
 where models_last_updated < current_date - interval '15 days'
-and "modelYear"::int >= extract(year from current_date) - 5
+and "modelYear"::int >= extract(year from current_date) - 7
 """)
 
 db = pg_connect()
@@ -1029,7 +1029,7 @@ select
     random()
 from recalls_download_tracker
 where recalls_last_updated < current_date - interval '14 days'
-and "modelYear"::int >= extract(year from current_date) - 5
+and "modelYear"::int >= extract(year from current_date) - 7
 order by random()
 limit 750
 """)
@@ -1053,7 +1053,7 @@ for _, row in recalls_download_tracker.iterrows():
         """)
         connection.execute(query,{'t':temp_df.shape[0],'x':row['modelYear'],'y':row['make'],'z':row['model']})
         connection.commit()
-    print(f"Recalls for {row['modelYear']} {row['Make']} {row['Model']} updated")
+    print(f"Recalls for {row['modelYear']} {row['make']} {row['model']} updated")
     time.sleep(1)
 
 pg_execute("drop table if exists recalls_backup")
